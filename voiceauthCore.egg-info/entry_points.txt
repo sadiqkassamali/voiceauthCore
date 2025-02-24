@@ -1,0 +1,2 @@
+[console_scripts]
+voiceauth = voiceauthCore.core:analyze_audio
