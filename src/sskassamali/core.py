@@ -1,16 +1,78 @@
+import logging
 import os
+import tempfile
+import sys
+from multiprocessing import freeze_support
+
 import librosa
 import tensorflow_hub as hub
 from transformers import pipeline
-from src.sskassamali.utils import convert_to_wav, get_file_metadata
-from src.sskassamali.database import save_metadata, init_db
-
+from voiceauthCore.src.sskassamali.utils import convert_to_wav, get_file_metadata
+from voiceauthCore.src.sskassamali.database import save_metadata, init_db
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+from io import BytesIO
+from PIL import Image
+import requests
+import argparse
+import torch
+freeze_support()
 # Load ML models
 yamnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
 vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
 pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
 pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
 pipe3 = pipeline("audio-classification", model="alexandreacff/sew-ft-fake-detection")
+
+# Determine base path (handles both PyInstaller frozen & normal script execution)
+if getattr(sys, "frozen", False):
+    base_path = os.path.join(tempfile.gettempdir(), "voiceauthCore")  # Temp directory for frozen app
+else:
+    base_path = os.path.join(os.getcwd(), "voiceauthCore")  # Local directory for regular execution
+
+# Create temp directory once (if it doesn't exist)
+os.makedirs(base_path, exist_ok=True)
+
+# Set temp_dir and ensure it's not repeatedly deleted
+temp_dir = base_path
+ffmpeg_path = os.path.join(base_path, "ffmpeg")
+
+if os.path.exists(ffmpeg_path):
+    os.environ["PATH"] += os.pathsep + ffmpeg_path+"ffmpeg.exe"
+
+# Set Librosa cache directory
+librosa_cache_dir = os.path.join(tempfile.gettempdir(), "librosa")
+os.makedirs(librosa_cache_dir, exist_ok=True)  # Ensure it exists
+os.environ["LIBROSA_CACHE_DIR"] = librosa_cache_dir
+
+def setup_logging(log_filename: str = "audio_detection.log") -> None:
+    """Sets up logging to both file and console."""
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(log_filename, mode="a"),
+            logging.StreamHandler(),
+        ],
+    )
+
+setup_logging()  # Call it early in the script
+logging.info("App starting...")
+
+# Load the pre-trained model and processor
+processor = AutoImageProcessor.from_pretrained("dima806/deepfake_vs_real_image_detection")
+model = AutoModelForImageClassification.from_pretrained("dima806/deepfake_vs_real_image_detection")
+
+def analyze_image(image_url):
+    response = requests.get(image_url)
+    image_bytes = response.content
+
+    image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    with torch.no_grad():
+        inputs = processor(images=image, return_tensors="pt")
+        outputs = model(**inputs)
+        logits = outputs.logits
+        predicted_class = torch.argmax(logits, dim=1).item()
+        return predicted_class == 0  # Return True if predicted as real, False otherwise
 
 def analyze_audio(file_path):
     """Analyzes an audio file using all three models and aggregates results."""

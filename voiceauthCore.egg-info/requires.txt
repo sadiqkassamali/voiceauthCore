@@ -1,6 +1,0 @@
-tensorflow
-librosa
-pydub
-numpy
-scipy
-transformers
