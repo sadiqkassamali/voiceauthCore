@@ -10,7 +10,7 @@ setup(
     long_description=open('README.md',encoding="utf8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/sadiqkassamali/voiceauthCore",
-    ackages=find_packages('.'),
+    packages=find_packages('.'),
     install_requires=[
         "tensorflow", "librosa", "pydub", "numpy", "scipy", "transformers" , "torch", "pillow"
     ],
