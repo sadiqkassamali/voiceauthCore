@@ -13,8 +13,8 @@ from transformers import AutoImageProcessor, AutoModelForImageClassification
 from io import BytesIO
 from PIL import Image
 import requests
-import argparse
 import torch
+
 freeze_support()
 # Load ML models
 yamnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
@@ -37,12 +37,13 @@ temp_dir = base_path
 ffmpeg_path = os.path.join(base_path, "ffmpeg")
 
 if os.path.exists(ffmpeg_path):
-    os.environ["PATH"] += os.pathsep + ffmpeg_path+"ffmpeg.exe"
+    os.environ["PATH"] += os.pathsep + ffmpeg_path + "ffmpeg.exe"
 
 # Set Librosa cache directory
 librosa_cache_dir = os.path.join(tempfile.gettempdir(), "librosa")
 os.makedirs(librosa_cache_dir, exist_ok=True)  # Ensure it exists
 os.environ["LIBROSA_CACHE_DIR"] = librosa_cache_dir
+
 
 def setup_logging(log_filename: str = "audio_detection.log") -> None:
     """Sets up logging to both file and console."""
@@ -55,12 +56,14 @@ def setup_logging(log_filename: str = "audio_detection.log") -> None:
         ],
     )
 
+
 setup_logging()  # Call it early in the script
 logging.info("App starting...")
 
 # Load the pre-trained model and processor
 processor = AutoImageProcessor.from_pretrained("dima806/deepfake_vs_real_image_detection")
 model = AutoModelForImageClassification.from_pretrained("dima806/deepfake_vs_real_image_detection")
+
 
 def analyze_image(image_url):
     response = requests.get(image_url)
@@ -73,6 +76,7 @@ def analyze_image(image_url):
         logits = outputs.logits
         predicted_class = torch.argmax(logits, dim=1).item()
         return predicted_class == 0  # Return True if predicted as real, False otherwise
+
 
 def analyze_audio(file_path):
     """Analyzes an audio file using all three models and aggregates results."""
@@ -97,33 +101,42 @@ def analyze_audio(file_path):
     except Exception as e:
         return {"error": str(e)}
 
+
 def predict_yamnet(file_path):
     audio, sr = librosa.load(file_path, sr=16000, mono=True)
     scores, embeddings, spectrogram = yamnet_model(audio)
     inferred_class = scores.numpy().mean(axis=0).argmax()
     return inferred_class, scores.numpy().mean()
 
+
 def predict_vggish(file_path):
     audio, sr = librosa.load(file_path, sr=16000, mono=True)
     embeddings = vggish_model(audio)
     return "VGGish_Features", embeddings.numpy().mean()
+
 
 def predict_hf(file_path):
     audio_data, sr = librosa.load(file_path, sr=16000)
     prediction = pipe(audio_data)
     return prediction[0]["label"], prediction[0]["score"]
 
+
 def predict_hf2(file_path):
     audio_data, sr = librosa.load(file_path, sr=16000)
     prediction = pipe2(audio_data)
     return prediction[0]["label"], prediction[0]["score"]
+
 
 def predict_rf(file_path):
     audio_data, sr = librosa.load(file_path, sr=16000)
     prediction = pipe3(audio_data)
     return prediction[0]["label"], prediction[0]["score"]
 
+
 if __name__ == "__main__":
     import sys
+
     file_path = sys.argv[1]
     print(analyze_audio(file_path))
+    print(analyze_image(file_path))
+
