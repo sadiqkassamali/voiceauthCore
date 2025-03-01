@@ -9,7 +9,7 @@ except FileNotFoundError:
 
 setup(
     name="voiceauthCore",
-    version="0.1.0",  # Use proper semantic versioning
+    version="0.1.1",  # Use proper semantic versioning
     author="Sadiq Kassamali",
     author_email="sadiq.kasssamali@gmail.com",
     description="A deepfake audio detection tool",
