@@ -8,7 +8,7 @@ except FileNotFoundError:
 
 setup(
     name="voiceauthCore",
-    version="0.1.4",
+    version="0.1.5",
     author="Sadiq Kassamali",
     author_email="sadiq.kasssamali@gmail.com",
     description="A deepfake audio detection tool",
