@@ -1,4 +1,3 @@
-## started the show
 from setuptools import setup, find_packages
 
 try:
@@ -9,16 +8,16 @@ except FileNotFoundError:
 
 setup(
     name="voiceauthCore",
-    version="0.1.1",  # Use proper semantic versioning
+    version="0.1.2",
     author="Sadiq Kassamali",
     author_email="sadiq.kasssamali@gmail.com",
     description="A deepfake audio detection tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/sadiqkassamali/voiceauthCore",
-    package_dir={"": "src"},  # Look for packages inside src/
-    packages=find_packages(where="src"),  # Find packages inside src/
-    include_package_data=True,  # Ensures all package data is included
+    package_dir={"voiceauthCore": "src/voiceauthCore"},  # Map package correctly
+    packages=find_packages(where="src"),  # Find all packages inside src/
+    include_package_data=True,  # Ensure all package files are included
     install_requires=[
         "tensorflow",
         "librosa",
@@ -27,7 +26,6 @@ setup(
         "scipy",
         "transformers",
         "pillow",
-        # ⚠️ Torch should be installed separately to avoid issues
         "torch ; sys_platform != 'darwin' and python_version >= '3.6'",
     ],
     entry_points={
