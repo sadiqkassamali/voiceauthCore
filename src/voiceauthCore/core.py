@@ -135,16 +135,6 @@ def predict_rf(file_path):
 
 if __name__ == "__main__":
     import sys
-
     file_path = sys.argv[1]
-# List of common image file extensions
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
-
-# Get the file extension (in lowercase)
-file_extension = os.path.splitext(file_path)[1].lower()
-
-if file_extension in IMAGE_EXTENSIONS:
-    print(analyze_image(file_path))
-else:
     print(analyze_audio(file_path))
 
