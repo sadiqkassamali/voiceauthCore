@@ -7,8 +7,8 @@ from multiprocessing import freeze_support
 import librosa
 import tensorflow_hub as hub
 from transformers import pipeline
-from src.voiceauthCore.utils import convert_to_wav, get_file_metadata
-from src.voiceauthCore.database import save_metadata, init_db
+from utils import convert_to_wav, get_file_metadata
+from database import save_metadata, init_db
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 from io import BytesIO
 from PIL import Image
