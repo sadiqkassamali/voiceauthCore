@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="voiceauthCore",
-    version="0.7",
+    version="v0.1",
     author="sadiq kassamali",
     author_email="sadiq.kasssamali@gmail.com",
     description="A deepfake audio detection tool",
