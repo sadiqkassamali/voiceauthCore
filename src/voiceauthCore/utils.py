@@ -7,10 +7,6 @@ import librosa
 import numpy as np
 from matplotlib import pyplot as plt
 from pydub import AudioSegment
-from sklearn.manifold import TSNE
-
-from voiceauthCore.core import predict_vggish
-
 
 def convert_to_wav(file_path):
     """Converts audio files to WAV format."""
@@ -106,58 +102,6 @@ def create_mel_spectrogram(temp_file_path):
         subprocess.run(["xdg-open", mel_file_path], check=True)
 
 
-def visualize_embeddings_tsne(file_path, output_path="tsne_visualization.png"):
-    embeddings = predict_vggish(file_path)
-
-    n_samples = embeddings.shape[0]
-
-    if n_samples <= 1:
-        print(
-            f"t-SNE cannot be performed with only {n_samples} sample(s). Skipping visualization."
-        )
-
-        plt.figure(figsize=(10, 6))
-        plt.text(
-            0.5,
-            0.5,
-            "Not enough samples for t-SNE",
-            fontsize=12,
-            ha="center")
-        plt.title("t-SNE Visualization of Audio Embeddings")
-        plt.savefig(output_path)
-        plt.close()
-        os.startfile(output_path)
-        return
-
-    perplexity = min(30, n_samples - 1)
-
-    perplexity = max(5.0, perplexity)
-
-    tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-    reduced_embeddings = tsne.fit_transform(embeddings)
-
-    plt.figure(figsize=(10, 6))
-    plt.scatter(
-        reduced_embeddings[:, 0],
-        reduced_embeddings[:, 1],
-        c="blue",
-        alpha=0.7,
-        edgecolors="k",
-    )
-    plt.title("t-SNE Visualization of Audio Embeddings")
-    plt.xlabel("Component 1")
-    plt.ylabel("Component 2")
-    plt.tight_layout()
-
-    plt.savefig(output_path)
-    plt.close()
-
-    if platform.system() == "Windows":
-        os.startfile(output_path)
-    elif platform.system() == "Darwin":  # macOS
-        subprocess.run(["open", output_path], check=True)
-    else:  # Linux/Unix
-        subprocess.run(["xdg-open", output_path], check=True)
 
 def get_file_metadata(file_path):
     """Returns metadata about an audio file."""

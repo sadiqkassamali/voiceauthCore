@@ -1,11 +1,14 @@
 import logging
 import os
+import subprocess
 import tempfile
 import sys
 from multiprocessing import freeze_support
 
 import librosa
 import tensorflow_hub as hub
+from matplotlib import pyplot as plt
+from sklearn.manifold import TSNE
 from transformers import pipeline
 from voiceauthCore.utils import convert_to_wav, get_file_metadata
 from voiceauthCore.database import save_metadata, init_db
@@ -131,6 +134,60 @@ def predict_rf(file_path):
     audio_data, sr = librosa.load(file_path, sr=16000)
     prediction = pipe3(audio_data)
     return prediction[0]["label"], prediction[0]["score"]
+
+
+def visualize_embeddings_tsne(file_path, output_path="tsne_visualization.png"):
+    embeddings = predict_vggish(file_path)
+
+    n_samples = embeddings.shape[0]
+
+    if n_samples <= 1:
+        print(
+            f"t-SNE cannot be performed with only {n_samples} sample(s). Skipping visualization."
+        )
+
+        plt.figure(figsize=(10, 6))
+        plt.text(
+            0.5,
+            0.5,
+            "Not enough samples for t-SNE",
+            fontsize=12,
+            ha="center")
+        plt.title("t-SNE Visualization of Audio Embeddings")
+        plt.savefig(output_path)
+        plt.close()
+        os.startfile(output_path)
+        return
+
+    perplexity = min(30, n_samples - 1)
+
+    perplexity = max(5.0, perplexity)
+
+    tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity)
+    reduced_embeddings = tsne.fit_transform(embeddings)
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(
+        reduced_embeddings[:, 0],
+        reduced_embeddings[:, 1],
+        c="blue",
+        alpha=0.7,
+        edgecolors="k",
+    )
+    plt.title("t-SNE Visualization of Audio Embeddings")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.tight_layout()
+
+    plt.savefig(output_path)
+    plt.close()
+
+    if sys.platform.system() == "Windows":
+        os.startfile(output_path)
+    elif sys.platform.system() == "Darwin":  # macOS
+        subprocess.run(["open", output_path], check=True)
+    else:  # Linux/Unix
+        subprocess.run(["xdg-open", output_path], check=True)
 
 
 if __name__ == "__main__":
