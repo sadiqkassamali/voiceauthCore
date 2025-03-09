@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from pydub import AudioSegment
 from sklearn.manifold import TSNE
 
-from src.voiceauthCore.core import predict_vggish
+from voiceauthCore.core import predict_vggish
 
 
 def convert_to_wav(file_path):
