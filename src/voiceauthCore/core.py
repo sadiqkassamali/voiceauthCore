@@ -113,37 +113,24 @@ def class_names_from_csv(class_map_csv_text):
 
 def predict_yamnet(file_path):
     try:
-        # Load audio file
         audio, sr = librosa.load(file_path, sr=16000, mono=True)
-
         outputs = yamnet_model(audio)
-
         scores, embeddings, spectrogram = outputs
-
         scores_np = scores.numpy()
-
         if scores_np.size == 0:
             raise ValueError("YAMNet model returned empty scores.")
 
-        # Get inferred class (most probable one)
         inferred_class_idx = np.mean(scores_np, axis=0).argmax()
 
-        # Load class names
         class_map_csv_bytes = tf.io.read_file(yamnet_model.class_map_path())
         class_map_text = class_map_csv_bytes.numpy().decode('utf-8')
 
-        # Parse class names
         class_names = class_names_from_csv(class_map_text)
-
         if inferred_class_idx >= len(class_names):
             raise IndexError("Inferred class index is out of range.")
 
-        # Get class name
         inferred_class_name = class_names[inferred_class_idx]
-
-        return f'The main sound is: {inferred_class_idx} - { inferred_class_name}'
-
-
+        return inferred_class_idx, inferred_class_name
     except Exception as e:
             print(f"Error in predict_yamnet: {e}")
             return None, "Unknown"

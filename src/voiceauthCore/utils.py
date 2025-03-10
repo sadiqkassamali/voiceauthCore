@@ -1,7 +1,7 @@
 import os
+import platform
 import subprocess
 import threading
-from sys import platform
 import soundfile as sf
 import librosa
 import numpy as np
