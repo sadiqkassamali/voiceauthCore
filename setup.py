@@ -8,16 +8,16 @@ except FileNotFoundError:
 
 setup(
     name="voiceauthCore",
-    version="0.1.19",
+    version="0.1.20",
     author="Sadiq Kassamali",
     author_email="sadiq.kasssamali@gmail.com",
     description="A deepfake audio detection tool",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/sadiqkassamali/voiceauthCore",
-    package_dir={"voiceauthCore": "src/voiceauthCore"},  # Map package correctly
-    packages=find_packages(where="src"),  # Find all packages inside src/
-    include_package_data=True,  # Ensure all package files are included
+    package_dir={"voiceauthCore": "src/voiceauthCore"},
+    packages=find_packages(where="src"),
+    include_package_data=True,
     install_requires=[
         "tensorflow",
         "librosa",

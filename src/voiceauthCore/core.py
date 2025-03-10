@@ -21,32 +21,32 @@ import torch
 import tensorflow.compat.v1 as tf
 
 freeze_support()
-# Load ML models
+
 yamnet_model = hub.load('https://tfhub.dev/google/yamnet/1')
 vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
 pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
 pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
 pipe3 = pipeline("audio-classification", model="alexandreacff/sew-ft-fake-detection")
 
-# Determine base path (handles both PyInstaller frozen & normal script execution)
-if getattr(sys, "frozen", False):
-    base_path = os.path.join(tempfile.gettempdir(), "voiceauthCore")  # Temp directory for frozen app
-else:
-    base_path = os.path.join(os.getcwd(), "voiceauthCore")  # Local directory for regular execution
 
-# Create temp directory once (if it doesn't exist)
+if getattr(sys, "frozen", False):
+    base_path = os.path.join(tempfile.gettempdir(), "voiceauthCore")
+else:
+    base_path = os.path.join(os.getcwd(), "voiceauthCore")
+
+
 os.makedirs(base_path, exist_ok=True)
 
-# Set temp_dir and ensure it's not repeatedly deleted
+
 temp_dir = base_path
 ffmpeg_path = os.path.join(base_path, "ffmpeg")
 
 if os.path.exists(ffmpeg_path):
     os.environ["PATH"] += os.pathsep + ffmpeg_path + "ffmpeg.exe"
 
-# Set Librosa cache directory
+
 librosa_cache_dir = os.path.join(tempfile.gettempdir(), "librosa")
-os.makedirs(librosa_cache_dir, exist_ok=True)  # Ensure it exists
+os.makedirs(librosa_cache_dir, exist_ok=True)  
 os.environ["LIBROSA_CACHE_DIR"] = librosa_cache_dir
 
 
@@ -62,10 +62,10 @@ def setup_logging(log_filename: str = "audio_detection.log") -> None:
     )
 
 
-setup_logging()  # Call it early in the script
+setup_logging()
 logging.info("App starting...")
 
-# Load the pre-trained model and processor
+
 processor = AutoImageProcessor.from_pretrained("dima806/deepfake_vs_real_image_detection")
 model = AutoModelForImageClassification.from_pretrained("dima806/deepfake_vs_real_image_detection")
 
@@ -80,7 +80,7 @@ def analyze_image(image_url):
         outputs = model(**inputs)
         logits = outputs.logits
         predicted_class = torch.argmax(logits, dim=1).item()
-        return predicted_class == 0  # Return True if predicted as real, False otherwise
+        return predicted_class == 0
 
 
 def analyze_audio(file_path):
@@ -113,7 +113,7 @@ def class_names_from_csv(class_map_csv_text):
 
 def predict_yamnet(file_path):
     try:
-        # Load audio file with librosa
+
         audio, sr = librosa.load(file_path, sr=16000, mono=True)
 
         outputs = yamnet_model(audio)
@@ -134,12 +134,12 @@ def predict_yamnet(file_path):
             raise IndexError(f"Inferred class index {inferred_class_idx} is out of range. Total classes: {len(class_names)}")
 
         inferred_class_name = class_names[inferred_class_idx]
-        confidence = np.mean(scores_np)  # Using the mean of the scores as the confidence value
+        confidence = np.mean(scores_np)
 
         return inferred_class_idx, inferred_class_name, confidence
 
     except Exception as e:
-        # Print and log the error if something goes wrong
+
         print(f"Error in predict_yamnet: {e}")
         return None, "Unknown", 0.0
 
@@ -169,9 +169,15 @@ def predict_rf(file_path):
 
 
 def visualize_embeddings_tsne(file_path, output_path="tsne_visualization.png"):
-    embeddings = predict_vggish(file_path)
 
-    n_samples = embeddings.shape[0]
+    embeddings, _ = predict_vggish(file_path)
+
+
+    if isinstance(embeddings, np.ndarray):
+        n_samples = embeddings.shape[0]
+    else:
+        print("Error: embeddings is not a valid NumPy array.")
+        return
 
     if n_samples <= 1:
         print(
@@ -192,11 +198,12 @@ def visualize_embeddings_tsne(file_path, output_path="tsne_visualization.png"):
         return
 
     perplexity = min(30, n_samples - 1)
-
     perplexity = max(5.0, perplexity)
+
 
     tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity)
     reduced_embeddings = tsne.fit_transform(embeddings)
+
 
     plt.figure(figsize=(10, 6))
     plt.scatter(
@@ -211,16 +218,17 @@ def visualize_embeddings_tsne(file_path, output_path="tsne_visualization.png"):
     plt.ylabel("Component 2")
     plt.tight_layout()
 
+
     plt.savefig(output_path)
     plt.close()
 
+
     if sys.platform.system() == "Windows":
         os.startfile(output_path)
-    elif sys.platform.system() == "Darwin":  # macOS
+    elif sys.platform.system() == "Darwin":
         subprocess.run(["open", output_path], check=True)
-    else:  # Linux/Unix
+    else:
         subprocess.run(["xdg-open", output_path], check=True)
-
 
 if __name__ == "__main__":
     import sys

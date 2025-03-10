@@ -67,9 +67,9 @@ def visualize_mfcc(temp_file_path):
 
     if platform.system() == "Windows":
         os.startfile(plt_file_path)
-    elif platform.system() == "Darwin":  # macOS
+    elif platform.system() == "Darwin":
         subprocess.run(["open", plt_file_path], check=True)
-    else:  # Linux/Unix
+    else:
         subprocess.run(["xdg-open", plt_file_path], check=True)
 
 
@@ -96,9 +96,9 @@ def create_mel_spectrogram(temp_file_path):
     plt.savefig(mel_file_path)
     if platform.system() == "Windows":
         os.startfile(mel_file_path)
-    elif platform.system() == "Darwin":  # macOS
+    elif platform.system() == "Darwin":
         subprocess.run(["open", mel_file_path], check=True)
-    else:  # Linux/Unix
+    else:
         subprocess.run(["xdg-open", mel_file_path], check=True)
 
 
@@ -109,20 +109,20 @@ def get_file_metadata(file_path):
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        # Get file size
-        file_size = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
 
-        # Load audio
+        file_size = os.path.getsize(file_path) / (1024 * 1024)
+
+
         y, sr = librosa.load(file_path, sr=None)
         duration = librosa.get_duration(y=y, sr=sr)
 
-        # Get file format
-        file_format = os.path.splitext(file_path)[-1].replace(".", "").upper()  # Extract extension (e.g., WAV, MP3)
 
-        # Calculate bitrate (approximate for non-lossy formats)
-        bitrate = (file_size * 8) / duration if duration > 0 else 0  # Convert MB to megabits
+        file_format = os.path.splitext(file_path)[-1].replace(".", "").upper()
 
-        # Extract additional metadata if needed
+
+        bitrate = (file_size * 8) / duration if duration > 0 else 0
+
+
         with sf.SoundFile(file_path) as audio_file:
             additional_metadata = {
                 "channels": audio_file.channels,
@@ -134,5 +134,5 @@ def get_file_metadata(file_path):
 
     except Exception as e:
         print(f"Error processing file {file_path}: {e}")
-        return None, None, None, None, None  # Ensure five values are always returned
+        return None, None, None, None, None
 

@@ -19,7 +19,7 @@ def save_metadata(file_path, label, confidence):
     conn = sqlite3.connect("voiceauth.db")
     cursor = conn.cursor()
 
-    # Ensure the table exists
+
     init_db()
 
     cursor.execute("INSERT INTO metadata (file_path, label, confidence) VALUES (?, ?, ?)",
