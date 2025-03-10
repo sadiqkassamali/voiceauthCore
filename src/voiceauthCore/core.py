@@ -10,6 +10,7 @@ import tensorflow_hub as hub
 from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
 from transformers import pipeline
+from voiceauthCore.core import yamnet_model
 from voiceauthCore.utils import convert_to_wav, get_file_metadata
 from voiceauthCore.database import save_metadata, init_db
 from transformers import AutoImageProcessor, AutoModelForImageClassification
@@ -20,7 +21,7 @@ import torch
 
 freeze_support()
 # Load ML models
-yamnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
+yamnetnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
 vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
 pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
 pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
