@@ -22,7 +22,7 @@ import tensorflow.compat.v1 as tf
 
 freeze_support()
 # Load ML models
-yamnet_model = hub.load('https://www.kaggle.com/models/google/yamnet/TensorFlow2/yamnet/1')
+yamnet_model = hub.load('https://tfhub.dev/google/yamnet/1')
 vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
 pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
 pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
@@ -116,13 +116,10 @@ def predict_yamnet(file_path):
         # Load audio file
         audio, sr = librosa.load(file_path, sr=16000, mono=True)
 
-        # Run model inference
         outputs = yamnet_model(audio)
 
-        # Extract scores, embeddings, and spectrogram
         scores, embeddings, spectrogram = outputs
 
-        # Convert scores to numpy
         scores_np = scores.numpy()
 
         if scores_np.size == 0:
@@ -144,11 +141,12 @@ def predict_yamnet(file_path):
         # Get class name
         inferred_class_name = class_names[inferred_class_idx]
 
-        return inferred_class_idx, inferred_class_name
+        return f'The main sound is: {inferred_class_idx} - { inferred_class_name}'
+
 
     except Exception as e:
-        print(f"Error in predict_yamnet: {e}")
-        return None, "Unknown"
+            print(f"Error in predict_yamnet: {e}")
+            return None, "Unknown"
 
 
 def predict_vggish(file_path):
