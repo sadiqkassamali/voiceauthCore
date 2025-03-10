@@ -6,6 +6,7 @@ import sys
 from multiprocessing import freeze_support
 
 import librosa
+import numpy as np
 import tensorflow_hub as hub
 from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
