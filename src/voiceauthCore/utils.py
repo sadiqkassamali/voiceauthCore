@@ -2,7 +2,7 @@ import os
 import subprocess
 import threading
 from sys import platform
-
+import soundfile as sf
 import librosa
 import numpy as np
 from matplotlib import pyplot as plt
@@ -104,7 +104,35 @@ def create_mel_spectrogram(temp_file_path):
 
 
 def get_file_metadata(file_path):
-    """Returns metadata about an audio file."""
-    y, sr = librosa.load(file_path, sr=None)
-    return {"sample_rate": sr, "duration": librosa.get_duration(y=y, sr=sr)}
+    """Returns detailed metadata about an audio file."""
+    try:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Get file size
+        file_size = os.path.getsize(file_path) / (1024 * 1024)  # Convert bytes to MB
+
+        # Load audio
+        y, sr = librosa.load(file_path, sr=None)
+        duration = librosa.get_duration(y=y, sr=sr)
+
+        # Get file format
+        file_format = os.path.splitext(file_path)[-1].replace(".", "").upper()  # Extract extension (e.g., WAV, MP3)
+
+        # Calculate bitrate (approximate for non-lossy formats)
+        bitrate = (file_size * 8) / duration if duration > 0 else 0  # Convert MB to megabits
+
+        # Extract additional metadata if needed
+        with sf.SoundFile(file_path) as audio_file:
+            additional_metadata = {
+                "channels": audio_file.channels,
+                "samplerate": audio_file.samplerate,
+                "subtype": audio_file.subtype
+            }
+
+        return file_format, file_size, duration, bitrate, additional_metadata
+
+    except Exception as e:
+        print(f"Error processing file {file_path}: {e}")
+        return None, None, None, None, None  # Ensure five values are always returned
 

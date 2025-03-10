@@ -17,10 +17,11 @@ from io import BytesIO
 from PIL import Image
 import requests
 import torch
+import tensorflow.compat.v1 as tf
 
 freeze_support()
 # Load ML models
-yamnetnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
+yamnet_model = hub.load('https://www.kaggle.com/models/google/yamnet/TensorFlow2/yamnet/1')
 vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
 pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
 pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
@@ -105,11 +106,48 @@ def analyze_audio(file_path):
         return {"error": str(e)}
 
 
+def class_names_from_csv(class_map_csv_text):
+    """Parses class names from YAMNet class map CSV."""
+    return [line.split(',')[0] for line in class_map_csv_text.splitlines() if line]
+
 def predict_yamnet(file_path):
-    audio, sr = librosa.load(file_path, sr=16000, mono=True)
-    scores, embeddings, spectrogram = yamnetnet_model(audio)
-    inferred_class = scores.numpy().mean(axis=0).argmax()
-    return inferred_class, scores.numpy().mean()
+    try:
+        # Load audio file
+        audio, sr = librosa.load(file_path, sr=16000, mono=True)
+
+        # Run model inference
+        outputs = yamnet_model(audio)
+
+        # Extract scores, embeddings, and spectrogram
+        scores, embeddings, spectrogram = outputs
+
+        # Convert scores to numpy
+        scores_np = scores.numpy()
+
+        if scores_np.size == 0:
+            raise ValueError("YAMNet model returned empty scores.")
+
+        # Get inferred class (most probable one)
+        inferred_class_idx = np.mean(scores_np, axis=0).argmax()
+
+        # Load class names
+        class_map_csv_bytes = tf.io.read_file(yamnet_model.class_map_path())
+        class_map_text = class_map_csv_bytes.numpy().decode('utf-8')
+
+        # Parse class names
+        class_names = class_names_from_csv(class_map_text)
+
+        if inferred_class_idx >= len(class_names):
+            raise IndexError("Inferred class index is out of range.")
+
+        # Get class name
+        inferred_class_name = class_names[inferred_class_idx]
+
+        return inferred_class_idx, inferred_class_name
+
+    except Exception as e:
+        print(f"Error in predict_yamnet: {e}")
+        return None, "Unknown"
 
 
 def predict_vggish(file_path):
