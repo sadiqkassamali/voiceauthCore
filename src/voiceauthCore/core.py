@@ -10,7 +10,6 @@ import tensorflow_hub as hub
 from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
 from transformers import pipeline
-from voiceauthCore.core import yamnet_model
 from voiceauthCore.utils import convert_to_wav, get_file_metadata
 from voiceauthCore.database import save_metadata, init_db
 from transformers import AutoImageProcessor, AutoModelForImageClassification
@@ -108,7 +107,7 @@ def analyze_audio(file_path):
 
 def predict_yamnet(file_path):
     audio, sr = librosa.load(file_path, sr=16000, mono=True)
-    scores, embeddings, spectrogram = yamnet_model(audio)
+    scores, embeddings, spectrogram = yamnetnet_model(audio)
     inferred_class = scores.numpy().mean(axis=0).argmax()
     return inferred_class, scores.numpy().mean()
 
