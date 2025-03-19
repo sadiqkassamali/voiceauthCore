@@ -45,6 +45,11 @@ supports various audio and video formats, converts them to WAV, and extracts fea
 
 [VoiceAuth.mp4](images%2FVoiceAuth.mp4)
 
+# 🎉Following API are avail:
+            /analyze-image
+            /analyze-audio
+
+
 ## Features
 
 - **Deepfake Detection**: Uses both a Random Forest model and a Hugging Face pipeline model for accurate predictions.
