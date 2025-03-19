@@ -1,5 +1,8 @@
 import base64
+import platform
+import shutil
 
+import psutil
 from flask import Flask, request, jsonify
 import os
 from werkzeug.utils import secure_filename
@@ -119,5 +122,40 @@ def analyze_image_api():
     })
 
 
+def display_system_info():
+
+    system_info = {
+        "Machine Name": platform.node(),
+        "OS": platform.system() + " " + platform.release(),
+        "Processor": platform.processor(),
+        "CPU Cores": psutil.cpu_count(logical=True),
+        "Total RAM (GB)": round(psutil.virtual_memory().total / (1024 ** 3), 2),
+        "Free RAM (GB)": round(psutil.virtual_memory().available / (1024 ** 3), 2),
+        "Disk Space (GB)": round(shutil.disk_usage("/").free / (1024 ** 3), 2),
+        "Home Directory": os.path.expanduser("~"),
+        "Current Working Directory": os.getcwd(),
+    }
+
+    ascii_banner = """
+██╗   ██╗ ██████╗ ██╗███████╗███████╗ █████╗ ██████╗  ██████╗ ██████╗ ███████╗
+██║   ██║██╔═══██╗██║╚══███╔╝██╔════╝██╔══██╗██╔══██╗██╔════╝ ██╔══██╗██╔════╝
+██║   ██║██║   ██║██║  ███╔╝ █████╗  ███████║██████╔╝██║  ███╗██████╔╝███████╗
+██║   ██║██║   ██║██║ ███╔╝  ██╔══╝  ██╔══██║██╔══██╗██║   ██║██╔══██╗╚════██║
+╚██████╔╝╚██████╔╝██║███████╗███████╗██║  ██║██║  ██║╚██████╔╝██║  ██║███████║
+ ╚═════╝  ╚═════╝ ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+            Welcome to VoiceAuthCore API
+            Following API are avail: 
+            /analyze-image
+            /analyze-audio
+    """
+
+    print(ascii_banner)
+    print("=" * 80)
+    for key, value in system_info.items():
+        print(f"{key}: {value}")
+    print("=" * 80)
+
+
 if __name__ == "__main__":
+    display_system_info()
     app.run(host="0.0.0.0", port=5000, debug=True)
