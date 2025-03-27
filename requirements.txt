@@ -28,3 +28,9 @@ typing_extensions
 packaging
 build
 platformdirs
+psutil
+tensorflow-intel
+params
+DateTime
+Sphinx
+Cython

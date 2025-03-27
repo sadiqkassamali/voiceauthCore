@@ -8,7 +8,7 @@ except FileNotFoundError:
 
 setup(
     name="voiceauthCore",
-    version="0.1.22",
+    version="0.1.3",
     author="Sadiq Kassamali",
     author_email="sadiq.kasssamali@gmail.com",
     description="A deepfake audio detection tool",
@@ -19,7 +19,6 @@ setup(
     packages=find_packages(where="src"),
     include_package_data=True,
     install_requires=[
-        "tensorflow",
         "librosa",
         "pydub",
         "numpy",
