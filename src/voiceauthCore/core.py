@@ -124,9 +124,7 @@ def predict_yamnet(file_path):
 
         inferred_class_idx = np.mean(scores_np, axis=0).argmax()
 
-        class_map_csv_bytes = tf.io.read_file(yamnet_model.class_map_path('yamnet_class_map.csv'))
-        class_map_text = class_map_csv_bytes.numpy().decode('utf-8')
-        class_names = class_names_from_csv(class_map_text)
+        class_names = yamnet_model.class_names('yamnet_class_map.csv')
         if inferred_class_idx >= len(class_names):
             raise IndexError(f"Inferred class index {inferred_class_idx} is out of range. Total classes: {len(class_names)}")
 
