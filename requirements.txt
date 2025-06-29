@@ -11,3 +11,5 @@ transformers
 pillow
 pydub
 setuptools
+voiceauthCore
+DateTime

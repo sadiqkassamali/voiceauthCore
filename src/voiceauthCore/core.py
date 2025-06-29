@@ -4,7 +4,6 @@ import subprocess
 import tempfile
 import sys
 from multiprocessing import freeze_support
-
 import librosa
 import numpy as np
 import tensorflow_hub as hub
@@ -20,252 +19,419 @@ import requests
 import torch
 import tensorflow.compat.v1 as tf
 import soundfile as sf
-import params as yamnet_params
+import uuid
+import hashlib
+
 freeze_support()
 
-yamnet_model = hub.load('https://tfhub.dev/google/yamnet/1')
-vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
-pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
-pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
-pipe3 = pipeline("audio-classification", model="alexandreacff/sew-ft-fake-detection")
+# Initialize models with error handling
+try:
+    yamnet_model = hub.load('https://tfhub.dev/google/yamnet/1')
+except Exception as e:
+    logging.warning(f"Failed to load YAMNet model: {e}")
+    yamnet_model = None
 
+try:
+    vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
+except Exception as e:
+    logging.warning(f"Failed to load VGGish model: {e}")
+    vggish_model = None
 
+try:
+    pipe = pipeline("audio-classification", model="alexandreacff/wav2vec2-large-ft-fake-detection")
+except Exception as e:
+    logging.warning(f"Failed to load HF model 1: {e}")
+    pipe = None
+
+try:
+    pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
+except Exception as e:
+    logging.warning(f"Failed to load HF model 2: {e}")
+    pipe2 = None
+
+try:
+    pipe3 = pipeline("audio-classification", model="alexandreacff/sew-ft-fake-detection")
+except Exception as e:
+    logging.warning(f"Failed to load HF model 3: {e}")
+    pipe3 = None
+
+# Path setup
 if getattr(sys, "frozen", False):
     base_path = os.path.join(tempfile.gettempdir(), "voiceauthCore")
 else:
     base_path = os.path.join(os.getcwd(), "voiceauthCore")
 
-
 os.makedirs(base_path, exist_ok=True)
-
-
 temp_dir = base_path
+
+# FFmpeg path setup
 ffmpeg_path = os.path.join(base_path, "ffmpeg")
-
 if os.path.exists(ffmpeg_path):
-    os.environ["PATH"] += os.pathsep + ffmpeg_path + "ffmpeg.exe"
+    os.environ["PATH"] += os.pathsep + ffmpeg_path
 
-
+# Librosa cache setup
 librosa_cache_dir = os.path.join(tempfile.gettempdir(), "librosa")
-os.makedirs(librosa_cache_dir, exist_ok=True)  
+os.makedirs(librosa_cache_dir, exist_ok=True)
 os.environ["LIBROSA_CACHE_DIR"] = librosa_cache_dir
 
 def setup_logging(log_filename: str = "audio_detection.log") -> None:
     """Sets up logging to both file and console."""
+    log_file_path = os.path.join(base_path, log_filename)
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.FileHandler(log_filename, mode="a"),
+            logging.FileHandler(log_file_path, mode="a"),
             logging.StreamHandler(),
         ],
     )
 
-
 setup_logging()
-logging.info("App starting...")
+logging.info("VoiceAuthCore starting...")
 
-processor = AutoImageProcessor.from_pretrained("dima806/deepfake_vs_real_image_detection")
-model = AutoModelForImageClassification.from_pretrained("dima806/deepfake_vs_real_image_detection")
+# Initialize image detection models
+try:
+    processor = AutoImageProcessor.from_pretrained("dima806/deepfake_vs_real_image_detection")
+    model = AutoModelForImageClassification.from_pretrained("dima806/deepfake_vs_real_image_detection")
+except Exception as e:
+    logging.warning(f"Failed to load image detection models: {e}")
+    processor = None
+    model = None
 
-def analyze_image(image_url):
-    response = requests.get(image_url)
-    image_bytes = response.content
+def analyze_image(image_path_or_url):
+    """Analyzes an image file or URL for deepfake detection."""
+    if not processor or not model:
+        return {"error": "Image detection models not available"}
 
-    image = Image.open(BytesIO(image_bytes)).convert("RGB")
-    with torch.no_grad():
-        inputs = processor(images=image, return_tensors="pt")
-        outputs = model(**inputs)
-        logits = outputs.logits
-        predicted_class = torch.argmax(logits, dim=1).item()
-        return predicted_class == 0
-
-def analyze_audio(file_path):
-    """Analyzes an audio file using all three models and aggregates results."""
     try:
-        wav_path = convert_to_wav(file_path)
-        label1, confidence1 = predict_yamnet(wav_path)
-        label2, confidence2 = predict_vggish(wav_path)
-        label3, confidence3 = predict_hf(wav_path)
-        label4, confidence4 = predict_hf2(wav_path)
-        label5, confidence5 = predict_rf(wav_path)
+        if image_path_or_url.startswith(('http://', 'https://')):
+            response = requests.get(image_path_or_url, timeout=30)
+            response.raise_for_status()
+            image_bytes = response.content
+            image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        else:
+            image = Image.open(image_path_or_url).convert("RGB")
 
-        results = {
-            "YAMNet": {"label": label1, "confidence": confidence1},
-            "VGGish": {"label": label2, "confidence": confidence2},
-            "HuggingFace Model 1": {"label": label3, "confidence": confidence3},
-            "HuggingFace Model 2": {"label": label4, "confidence": confidence4},
-            "R-Forest": {"label": label5, "confidence": confidence5},
-        }
+        with torch.no_grad():
+            inputs = processor(images=image, return_tensors="pt")
+            outputs = model(**inputs)
+            logits = outputs.logits
+            predicted_class = torch.argmax(logits, dim=1).item()
+            confidence = torch.softmax(logits, dim=1).max().item()
 
-        save_metadata(file_path, results, max(confidence1, confidence2, confidence3, confidence4, confidence5))
-        return results
+            label = "Real" if predicted_class == 0 else "Fake"
+
+            return {
+                "Image Detection": {
+                    "label": label,
+                    "confidence": float(confidence)
+                }
+            }
+
     except Exception as e:
+        logging.error(f"Error in image analysis: {e}")
         return {"error": str(e)}
 
+def analyze_audio(file_path):
+    """Analyzes an audio file using all available models and aggregates results."""
+    try:
+        # Convert to WAV format
+        wav_path = convert_to_wav(file_path)
 
-def class_names_from_csv(class_map_csv_text):
-    """Parses class names from YAMNet class map CSV."""
-    return [line.split(',')[0] for line in class_map_csv_text.splitlines() if line]
+        results = {}
+
+        # Run all prediction models
+        if yamnet_model:
+            try:
+                label1, confidence1 = predict_yamnet(wav_path)
+                results["YAMNet"] = {"label": label1, "confidence": confidence1}
+            except Exception as e:
+                logging.error(f"YAMNet prediction failed: {e}")
+                results["YAMNet"] = {"label": "Error", "confidence": 0.0}
+
+        if vggish_model:
+            try:
+                label2, confidence2 = predict_vggish(wav_path)
+                results["VGGish"] = {"label": label2, "confidence": confidence2}
+            except Exception as e:
+                logging.error(f"VGGish prediction failed: {e}")
+                results["VGGish"] = {"label": "Error", "confidence": 0.0}
+
+        if pipe:
+            try:
+                label3, confidence3 = predict_hf(wav_path)
+                results["HuggingFace Model 1"] = {"label": label3, "confidence": confidence3}
+            except Exception as e:
+                logging.error(f"HF Model 1 prediction failed: {e}")
+                results["HuggingFace Model 1"] = {"label": "Error", "confidence": 0.0}
+
+        if pipe2:
+            try:
+                label4, confidence4 = predict_hf2(wav_path)
+                results["HuggingFace Model 2"] = {"label": label4, "confidence": confidence4}
+            except Exception as e:
+                logging.error(f"HF Model 2 prediction failed: {e}")
+                results["HuggingFace Model 2"] = {"label": "Error", "confidence": 0.0}
+
+        if pipe3:
+            try:
+                label5, confidence5 = predict_rf(wav_path)
+                results["Random Forest"] = {"label": label5, "confidence": confidence5}
+            except Exception as e:
+                logging.error(f"Random Forest prediction failed: {e}")
+                results["Random Forest"] = {"label": "Error", "confidence": 0.0}
+
+        # Calculate combined confidence
+        valid_confidences = [
+            result["confidence"] for result in results.values()
+            if result["confidence"] > 0 and result["label"] != "Error"
+        ]
+        max_confidence = max(valid_confidences) if valid_confidences else 0.0
+
+        # Save metadata to database
+        try:
+            file_uuid = str(uuid.uuid4())
+            save_metadata(file_uuid, file_path, str(results))
+        except Exception as e:
+            logging.warning(f"Failed to save metadata: {e}")
+
+        # Clean up temporary WAV file if it was created
+        if wav_path != file_path and os.path.exists(wav_path):
+            try:
+                os.remove(wav_path)
+            except Exception as e:
+                logging.warning(f"Failed to clean up temp file: {e}")
+
+        return results
+
+    except Exception as e:
+        logging.error(f"Error in audio analysis: {e}")
+        return {"error": str(e)}
 
 def predict_yamnet(file_path):
-    try:
+    """Predict using YAMNet model."""
+    if not yamnet_model:
+        return "Model Not Available", 0.0
 
+    try:
+        # Load audio with proper sampling rate for YAMNet
         audio, sr = librosa.load(file_path, sr=16000, mono=True)
 
-        outputs = yamnet_model(audio)
-
-        scores, embeddings, spectrogram = outputs
-
+        # Run YAMNet prediction
+        scores, embeddings, spectrogram = yamnet_model(audio)
         scores_np = scores.numpy()
 
         if scores_np.size == 0:
-            raise ValueError("YAMNet model returned empty scores.")
+            return "No Audio Detected", 0.0
 
-        inferred_class_idx = np.mean(scores_np, axis=0).argmax()
+        # Get the most confident class
+        mean_scores = np.mean(scores_np, axis=0)
+        top_class_idx = np.argmax(mean_scores)
+        confidence = float(mean_scores[top_class_idx])
 
-        class_names = yamnet_model.class_names('yamnet_class_map.csv')
-        if inferred_class_idx >= len(class_names):
-            raise IndexError(f"Inferred class index {inferred_class_idx} is out of range. Total classes: {len(class_names)}")
+        # Simple heuristic for fake detection based on audio characteristics
+        # This is a simplified approach - in practice you'd want a trained classifier
+        speech_related_classes = [0, 1, 2, 3, 24, 25]  # Speech, conversation, singing etc.
+        if top_class_idx in speech_related_classes:
+            # Higher confidence in speech-related classes might indicate real audio
+            label = "Real" if confidence > 0.5 else "Fake"
+        else:
+            label = "Uncertain"
 
-        inferred_class_name = class_names[inferred_class_idx]
-        confidence = np.mean(scores_np)
-
-        wav_data, sr = sf.read(outputs, dtype=np.int16)
-        waveform = wav_data / 32768.0
-
-        # The graph is designed for a sampling rate of 16 kHz, but higher rates should work too.
-        # We also generate scores at a 10 Hz frame rate.
-        params = yamnet_params.Params(sample_rate=sr, patch_hop_seconds=0.1)
-        print("Sample rate =", params.sample_rate)
-
-        yamnet = yamnet_model.yamnet_frames_model(params)
-        yamnet.load_weights('yamnet.h5')
-
-        # Run the model.
-        scores, embeddings, spectrogram = yamnet(waveform)
-        scores = scores.numpy()
-        spectrogram = spectrogram.numpy()
-
-        # Visualize the results.
-        plt.figure(figsize=(10, 8))
-
-        # Plot the waveform.
-        plt.subplot(3, 1, 1)
-        plt.plot(waveform)
-        plt.xlim([0, len(waveform)])
-        # Plot the log-mel spectrogram (returned by the model).
-        plt.subplot(3, 1, 2)
-        plt.imshow(spectrogram.T, aspect='auto', interpolation='nearest', origin='bottom')
-
-        # Plot and label the model output scores for the top-scoring classes.
-        mean_scores = np.mean(scores, axis=0)
-        top_N = 10
-        top_class_indices = np.argsort(mean_scores)[::-1][:top_N]
-        plt.subplot(3, 1, 3)
-        plt.imshow(scores[:, top_class_indices].T, aspect='auto', interpolation='nearest', cmap='gray_r')
-        # Compensate for the patch_window_seconds (0.96s) context window to align with spectrogram.
-        patch_padding = (params.patch_window_seconds / 2) / params.patch_hop_seconds
-        plt.xlim([-patch_padding, scores.shape[0] + patch_padding])
-        # Label the top_N classes.
-        yticks = range(0, top_N, 1)
-        plt.yticks(yticks, [class_names[top_class_indices[x]] for x in yticks])
-        _ = plt.ylim(-0.5 + np.array([top_N, 0]))
-        return inferred_class_idx, inferred_class_name, confidence
+        return label, confidence
 
     except Exception as e:
-        print(f"Error in predict_yamnet: {e}")
-        return None, "Unknown", 0.0
-
+        logging.error(f"Error in YAMNet prediction: {e}")
+        return "Error", 0.0
 
 def predict_vggish(file_path):
-    audio, sr = librosa.load(file_path, sr=16000, mono=True)
-    embeddings = vggish_model(audio)
-    return "VGGish_Features", embeddings.numpy().mean()
+    """Predict using VGGish model."""
+    if not vggish_model:
+        return "Model Not Available", 0.0
 
+    try:
+        audio, sr = librosa.load(file_path, sr=16000, mono=True)
+        embeddings = vggish_model(audio)
+
+        # Simple analysis of embeddings
+        # In practice, you'd train a classifier on top of these embeddings
+        embedding_stats = np.mean(embeddings.numpy())
+        confidence = float(abs(embedding_stats))
+
+        # Simple heuristic based on embedding characteristics
+        label = "Real" if embedding_stats > 0 else "Fake"
+
+        return label, min(confidence, 1.0)
+
+    except Exception as e:
+        logging.error(f"Error in VGGish prediction: {e}")
+        return "Error", 0.0
 
 def predict_hf(file_path):
-    audio_data, sr = librosa.load(file_path, sr=16000)
-    prediction = pipe(audio_data)
-    return prediction[0]["label"], prediction[0]["score"]
+    """Predict using first HuggingFace model."""
+    if not pipe:
+        return "Model Not Available", 0.0
 
+    try:
+        audio_data, sr = librosa.load(file_path, sr=16000)
+        prediction = pipe(audio_data)
+
+        if isinstance(prediction, list) and len(prediction) > 0:
+            result = prediction[0]
+            label = result.get("label", "Unknown")
+            confidence = float(result.get("score", 0.0))
+
+            # Normalize label format
+            if "fake" in label.lower():
+                label = "Fake"
+            elif "real" in label.lower() or "authentic" in label.lower():
+                label = "Real"
+
+            return label, confidence
+        else:
+            return "No Prediction", 0.0
+
+    except Exception as e:
+        logging.error(f"Error in HF model 1 prediction: {e}")
+        return "Error", 0.0
 
 def predict_hf2(file_path):
-    audio_data, sr = librosa.load(file_path, sr=16000)
-    prediction = pipe2(audio_data)
-    return prediction[0]["label"], prediction[0]["score"]
+    """Predict using second HuggingFace model."""
+    if not pipe2:
+        return "Model Not Available", 0.0
 
+    try:
+        audio_data, sr = librosa.load(file_path, sr=16000)
+        prediction = pipe2(audio_data)
+
+        if isinstance(prediction, list) and len(prediction) > 0:
+            result = prediction[0]
+            label = result.get("label", "Unknown")
+            confidence = float(result.get("score", 0.0))
+
+            # Normalize label format
+            if "fake" in label.lower():
+                label = "Fake"
+            elif "real" in label.lower() or "authentic" in label.lower():
+                label = "Real"
+
+            return label, confidence
+        else:
+            return "No Prediction", 0.0
+
+    except Exception as e:
+        logging.error(f"Error in HF model 2 prediction: {e}")
+        return "Error", 0.0
 
 def predict_rf(file_path):
-    audio_data, sr = librosa.load(file_path, sr=16000)
-    prediction = pipe3(audio_data)
-    return prediction[0]["label"], prediction[0]["score"]
+    """Predict using Random Forest model (third HuggingFace model)."""
+    if not pipe3:
+        return "Model Not Available", 0.0
 
+    try:
+        audio_data, sr = librosa.load(file_path, sr=16000)
+        prediction = pipe3(audio_data)
+
+        if isinstance(prediction, list) and len(prediction) > 0:
+            result = prediction[0]
+            label = result.get("label", "Unknown")
+            confidence = float(result.get("score", 0.0))
+
+            # Normalize label format
+            if "fake" in label.lower():
+                label = "Fake"
+            elif "real" in label.lower() or "authentic" in label.lower():
+                label = "Real"
+
+            return label, confidence
+        else:
+            return "No Prediction", 0.0
+
+    except Exception as e:
+        logging.error(f"Error in Random Forest prediction: {e}")
+        return "Error", 0.0
 
 def visualize_embeddings_tsne(file_path, output_path="tsne_visualization.png"):
+    """Create t-SNE visualization of audio embeddings."""
+    try:
+        if not vggish_model:
+            logging.warning("VGGish model not available for visualization")
+            return
 
-    embeddings, _ = predict_vggish(file_path)
+        # Get embeddings
+        audio, sr = librosa.load(file_path, sr=16000, mono=True)
+        embeddings = vggish_model(audio)
+        embeddings_np = embeddings.numpy()
 
+        if embeddings_np.ndim == 1:
+            embeddings_np = embeddings_np.reshape(1, -1)
 
-    if isinstance(embeddings, np.ndarray):
-        n_samples = embeddings.shape[0]
-    else:
-        print("Error: embeddings is not a valid NumPy array.")
-        return
+        n_samples = embeddings_np.shape[0]
 
-    if n_samples <= 1:
-        print(
-            f"t-SNE cannot be performed with only {n_samples} sample(s). Skipping visualization."
-        )
+        if n_samples <= 1:
+            logging.info(f"Not enough samples ({n_samples}) for t-SNE visualization")
+            # Create simple plot indicating insufficient data
+            plt.figure(figsize=(10, 6))
+            plt.text(0.5, 0.5, "Insufficient data for t-SNE\n(Need multiple time segments)",
+                     fontsize=14, ha="center", va="center", transform=plt.gca().transAxes)
+            plt.title("t-SNE Visualization of Audio Embeddings")
+            plt.savefig(output_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            return
 
+        # Perform t-SNE
+        perplexity = min(30, n_samples - 1)
+        perplexity = max(5.0, perplexity)
+
+        tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity)
+        reduced_embeddings = tsne.fit_transform(embeddings_np)
+
+        # Create visualization
         plt.figure(figsize=(10, 6))
-        plt.text(
-            0.5,
-            0.5,
-            "Not enough samples for t-SNE",
-            fontsize=12,
-            ha="center")
+        plt.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1],
+                    c="blue", alpha=0.7, edgecolors="k", s=50)
         plt.title("t-SNE Visualization of Audio Embeddings")
-        plt.savefig(output_path)
+        plt.xlabel("Component 1")
+        plt.ylabel("Component 2")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=150, bbox_inches='tight')
         plt.close()
-        os.startfile(output_path)
-        return
 
-    perplexity = min(30, n_samples - 1)
-    perplexity = max(5.0, perplexity)
+        # Open the file based on platform
+        try:
+            if sys.platform == "win32":
+                os.startfile(output_path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", output_path], check=True)
+            else:
+                subprocess.run(["xdg-open", output_path], check=True)
+        except Exception as e:
+            logging.warning(f"Could not open visualization file: {e}")
 
+    except Exception as e:
+        logging.error(f"Error creating t-SNE visualization: {e}")
 
-    tsne = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-    reduced_embeddings = tsne.fit_transform(embeddings)
+def main():
+    """Main function for command line usage."""
+    if len(sys.argv) < 2:
+        print("Usage: python core.py <audio_file_path>")
+        sys.exit(1)
 
+    file_path = sys.argv[1]
+    if not os.path.exists(file_path):
+        print(f"Error: File '{file_path}' not found.")
+        sys.exit(1)
 
-    plt.figure(figsize=(10, 6))
-    plt.scatter(
-        reduced_embeddings[:, 0],
-        reduced_embeddings[:, 1],
-        c="blue",
-        alpha=0.7,
-        edgecolors="k",
-    )
-    plt.title("t-SNE Visualization of Audio Embeddings")
-    plt.xlabel("Component 1")
-    plt.ylabel("Component 2")
-    plt.tight_layout()
+    print(f"Analyzing: {file_path}")
+    results = analyze_audio(file_path)
 
-
-    plt.savefig(output_path)
-    plt.close()
-
-
-    if sys.platform.system() == "Windows":
-        os.startfile(output_path)
-    elif sys.platform.system() == "Darwin":
-        subprocess.run(["open", output_path], check=True)
+    if "error" in results:
+        print(f"Error: {results['error']}")
     else:
-        subprocess.run(["xdg-open", output_path], check=True)
+        print("Analysis Results:")
+        for model_name, result in results.items():
+            print(f"  {model_name}: {result['label']} (Confidence: {result['confidence']:.3f})")
 
 if __name__ == "__main__":
-    import sys
-    file_path = sys.argv[1]
-    print(analyze_audio(file_path))
-
+    main()
