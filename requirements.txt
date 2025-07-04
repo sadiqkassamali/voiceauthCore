@@ -13,3 +13,4 @@ pydub
 setuptools
 voiceauthCore
 DateTime
+cx_freeze

@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/venv/venv.iml" filepath="$PROJECT_DIR$/venv/venv.iml" />
+      <module fileurl="file://$PROJECT_DIR$/voiceauthCore.iml" filepath="$PROJECT_DIR$/voiceauthCore.iml" />
     </modules>
   </component>
 </project>
