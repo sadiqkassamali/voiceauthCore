@@ -2,11 +2,13 @@ import logging
 import os
 import subprocess
 import tempfile
+
+import kagglehub
 import sys
 from multiprocessing import freeze_support
 import librosa
 import numpy as np
-import tensorflow_hub as hub
+import tensorflow as tf
 from matplotlib import pyplot as plt
 from sklearn.manifold import TSNE
 from transformers import pipeline
@@ -17,22 +19,20 @@ from io import BytesIO
 from PIL import Image
 import requests
 import torch
-import tensorflow.compat.v1 as tf
 import soundfile as sf
 import uuid
 import hashlib
-
 freeze_support()
 
 # Initialize models with error handling
 try:
-    yamnet_model = hub.load('https://tfhub.dev/google/yamnet/1')
+    yamnet_model = tf.keras.models.load_model('models/yamnet')
 except Exception as e:
     logging.warning(f"Failed to load YAMNet model: {e}")
     yamnet_model = None
 
 try:
-    vggish_model = hub.load("https://www.kaggle.com/models/google/vggish/TensorFlow2/vggish/1")
+    vggish_model = tf.keras.models.load_model("models/vggish")
 except Exception as e:
     logging.warning(f"Failed to load VGGish model: {e}")
     vggish_model = None
@@ -44,9 +44,9 @@ except Exception as e:
     pipe = None
 
 try:
-    pipe2 = pipeline("audio-classification", model="WpythonW/ast-fakeaudio-detector")
+    pipe2 =  tf.keras.models.load_model('models/aestroe')
 except Exception as e:
-    logging.warning(f"Failed to load HF model 2: {e}")
+    logging.warning(f"Failed to load openai  model 2: {e}")
     pipe2 = None
 
 try:
