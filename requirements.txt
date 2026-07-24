@@ -10,6 +10,6 @@ scikit-learn==1.7.0
 transformers==4.53.0
 pillow==11.3.0
 pydub==0.25.1
-setuptools==80.4.0
+setuptools==83.0.0
 voiceauthCore==0.1.53
 DateTime==5.5
